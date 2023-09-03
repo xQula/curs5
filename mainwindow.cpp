@@ -21,6 +21,8 @@ MainWindow::MainWindow(QWidget *parent)
     data_connecting_db = new DataForConnectingDataBase();
     msg = new QMessageBox(this);
     data_base->add_data_base(POSTGRE_DRIVER, DB_NAME);
+    ui->de_dataDeparture->setMinimumDate({2016,8,15});
+    ui->de_dataDeparture->setMaximumDate({2017,9,14});
 
     connect(data_base, &AirportDatabase::sig_send_status_connection, this, &MainWindow::sl_getting_the_status_db);
     connect(data_base, &AirportDatabase::sig_send_err_db, this, &MainWindow::sl_getting_the_error_db);
@@ -29,7 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(timer, &QTimer::timeout, this, &MainWindow::on_act_connect_triggered);
     connect(histograms, &HistogramsAirportCongestion::sig_send_histogram_view, this, &MainWindow::sl_add_wd_histogram_airport);
     connect(shedule, &AirportCongestionShedule::sig_send_graph_view, this, &MainWindow::sl_add_wd_graph_airport);
-    connect(ui_stat_airport, &StatisticsAirport::sig_send_change_month, this, &MainWindow::sl_send_reqest_db_for_graph);
+    connect(ui_stat_airport, &StatisticsAirport::sig_send_change_month, this, [this]{shedule->clear_graph() ;shedule->add_data_graph(ui_stat_airport->getting_index_month(), getting_days_from_month(ui_stat_airport->getting_index_month()));});
     connect(data_base, &AirportDatabase::sig_send_data_from_db_from_graph, this, &MainWindow::sl_getting_the_query_model_from_graph);
     connect(data_base, &AirportDatabase::sig_send_data_from_db_from_histogram, this, &MainWindow::sl_getting_the_query_model_from_histogram);
 
@@ -109,20 +111,6 @@ int MainWindow::getting_days_from_month(int month)
     return{};
 }
 
-bool MainWindow::date_limit(QDate *date)
-{
-    QDate before_date({2016, 7, 31});
-    QDate after_date({2017, 10, 1});
-
-    if(*date <= before_date || *date >= after_date){
-        msg->setText("Указана неверная дата");
-        msg->setIcon(QMessageBox::Warning);
-        msg->show();
-        return false;
-    }
-    return true;
-}
-
 void MainWindow::sl_getting_the_status_db(bool status)
 {
     if(status){
@@ -164,25 +152,16 @@ void MainWindow::sl_getting_the_query_model_db_tw_airoport(QSqlQueryModel *model
 
 void MainWindow::sl_getting_the_query_model_from_graph(QSqlQueryModel *query_model_departure, QSqlQueryModel *query_model_arrival)
 {
-    QVector<uint32_t> departure, arrival;
-    int days = getting_days_from_month(ui_stat_airport->getting_index_month());
-    int idx_j = 0;
-    for(uint32_t i = 1; i <= days; ++i){
-        if(query_model_arrival->record(idx_j).value(1).toDate().toString("d" ) == QString::number(i)){
-            departure.push_back(query_model_departure->record(idx_j).value(0).toUInt());
-            ++idx_j;
-        }else
-            departure.push_back(0);
+    QVector<QVector<uint32_t>> departure, arrival;
+    departure.resize(12);
+    arrival.resize(12);
+    for(int i = 0; i < query_model_departure->rowCount(); ++i){
+        departure[query_model_departure->record(i).value(1).toDate().toString("M").toInt()-1].push_back(query_model_departure->record(i).value(0).toUInt());
     }
-    idx_j = 0;
-    for(uint32_t i = 1; i <= days; ++i){
-        if(query_model_arrival->record(idx_j).value(1).toDate().toString("d" ) == QString::number(i)){
-            arrival.push_back(query_model_arrival->record(idx_j).value(0).toUInt());
-            ++idx_j;
-        }else
-            arrival.push_back(0);
+    for(int i = 0; i < query_model_departure->rowCount(); ++i){
+        arrival[query_model_arrival->record(i).value(1).toDate().toString("M").toInt()-1].push_back(query_model_arrival->record(i).value(0).toUInt());
     }
-    shedule->add_data_graph(departure, arrival, days);
+    shedule->add_data_shipments(departure, arrival);
 }
 
 void MainWindow::sl_getting_the_query_model_from_histogram(QSqlQueryModel *query_model_departure, QSqlQueryModel *query_model_arrival)
@@ -207,17 +186,15 @@ void MainWindow::sl_add_wd_graph_airport(QChartView *wd)
     ui_stat_airport->add_wd_graph(wd);
 }
 
-void MainWindow::sl_send_reqest_db_for_graph(int month)
+void MainWindow::sl_send_reqest_db_for_graph()
 {
     shedule->clear_graph();
     QString code_airport = data_base->get_code_airport_from_model_bd(ui->cb_bdAirport->currentText());
-    QString year = ui->de_dataDeparture->date().toString("yyyy");
-    int num_days = getting_days_from_month(month);
     data_base->request_to_db_from_graph("SELECT count(flight_no), date_trunc('day', scheduled_departure) as \"Day\" from bookings.flights f "
-                                        "WHERE(scheduled_departure::date > date('"+ year +"-"+ QString::number(month+1) +"-1') and scheduled_departure::date <= date('"+ year +"-"+ QString::number(month+1) +"-"+ QString::number(num_days) +"')) and ( departure_airport = '"+ code_airport +"') "
+                                        "WHERE(scheduled_departure::date > date('2016-08-31') and scheduled_departure::date <= date('2017-08-31')) and ( departure_airport = '"+ code_airport +"') "
                                         "GROUP BY \"Day\"",
                                         "SELECT count(flight_no), date_trunc('day', scheduled_departure) as \"Day\" from bookings.flights f "
-                                        "WHERE(scheduled_arrival::date > date('"+ year +"-"+ QString::number(month+1) +"-1') and scheduled_arrival::date <= date('"+ year +"-"+ QString::number(month+1) +"-"+ QString::number(num_days) +"')) and ( arrival_airport = '"+ code_airport +"') "
+                                        "WHERE(scheduled_arrival::date > date('2016-08-31') and scheduled_arrival::date <= date('2017-08-31')) and ( arrival_airport = '"+ code_airport +"') "
                                         "GROUP BY \"Day\""
                                         );
 }
@@ -246,7 +223,6 @@ void MainWindow::on_act_connect_triggered()
 void MainWindow::on_pb_findBD_clicked()
 {
     QDate date = ui->de_dataDeparture->date();
-    if(!date_limit(&date)) return;
     QString code_airport = data_base->get_code_airport_from_model_bd(ui->cb_bdAirport->currentText());
     if(ui->cb_where->currentText() == "Вылет"){
         data_base->request_to_db_tw_airport("SELECT flight_no, scheduled_arrival, ad.airport_name->>'ru' as \"Name\" from bookings.flights f "
@@ -267,12 +243,8 @@ void MainWindow::on_pb_statistics_clicked()
     ui_stat_airport->setModal(true);
     ui_stat_airport->show();
     ui_stat_airport->change_month();
-    QDate date = ui->de_dataDeparture->date();
-    if(!date_limit(&date)){
-        ui_stat_airport->close();
-        return;
-    }
-    sl_send_reqest_db_for_graph(ui_stat_airport->getting_index_month());
+    sl_send_reqest_db_for_graph();
+    shedule->add_data_graph(ui_stat_airport->getting_index_month(), getting_days_from_month(ui_stat_airport->getting_index_month()));
     send_reqest_db_for_histogram();
 }
 

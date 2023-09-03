@@ -14,7 +14,8 @@ class AirportCongestionShedule : public QObject
 public:
     explicit AirportCongestionShedule(QObject *parent = nullptr);
     ~AirportCongestionShedule();
-    void add_data_graph(const QVector<uint32_t> &data_departure, const QVector<uint32_t> &data_arrival, const int num_month);
+    void add_data_graph(const int num_month, const int num_days);
+    void add_data_shipments( QVector<QVector<uint32_t>> &departure, QVector<QVector<uint32_t>> &arrival);
     void clear_graph();
 signals:
     void sig_send_graph_view(QChartView * view);
@@ -23,8 +24,10 @@ private:
     QLineSeries* graph_arrival;
     QChart *chart;
     QChartView *chart_view;
-    QCategoryAxis *categoty_axis;
-    QValueAxis *value_axis;
+    QValueAxis *value_axis_y;
+    QValueAxis *value_axis_x;
+    QVector<QVector<uint32_t>> departure_data;
+    QVector<QVector<uint32_t>> arrival_data;
 };
 
 #endif // AIRPORTCONGESTIONSHEDULE_H

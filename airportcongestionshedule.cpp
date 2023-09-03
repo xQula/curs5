@@ -7,8 +7,8 @@ AirportCongestionShedule::AirportCongestionShedule(QObject *parent)
     graph_arrival = new QLineSeries();
     chart = new QChart();
     chart_view = new QChartView();
-    value_axis = new QValueAxis();
-    categoty_axis = new QCategoryAxis();
+    value_axis_y = new QValueAxis();
+    value_axis_x = new QValueAxis();
 }
 
 AirportCongestionShedule::~AirportCongestionShedule()
@@ -17,16 +17,16 @@ AirportCongestionShedule::~AirportCongestionShedule()
     delete graph_arrival;
     delete chart;
     delete chart_view;
-    delete value_axis;
-    delete categoty_axis;
+    delete value_axis_y;
+    delete value_axis_x;
 }
 
-void AirportCongestionShedule::add_data_graph(const QVector<uint32_t> &data_departure, const QVector<uint32_t> &data_arrival, const int num_month)
+void AirportCongestionShedule::add_data_graph(const int num_month, const int num_days)
 {
     int max = 0;
     {
-        auto max_one = *std::max_element(data_departure.begin(), data_departure.end());
-        auto max_two = *std::max_element(data_arrival.begin(), data_arrival.end());
+        auto max_one = *std::max_element(departure_data[num_month].begin(), departure_data[num_month].end());
+        auto max_two = *std::max_element(arrival_data[num_month].begin(), arrival_data[num_month].end());
         max = max_one > max_two ? max_one : max_two;
     }
     {
@@ -40,12 +40,12 @@ void AirportCongestionShedule::add_data_graph(const QVector<uint32_t> &data_depa
             }
         }
     }
-    for(QVector<uint32_t>::size_type i = 0; i < data_departure.size(); ++i){
-        graph_departure->append(i, data_departure[i]);
+    for(QVector<uint32_t>::size_type i = 0; i < departure_data[num_month].size(); ++i){
+        graph_departure->append(i+1, departure_data[num_month][i]);
 
     }
-    for(QVector<uint32_t>::size_type i = 0; i < data_arrival.size(); ++i){
-        graph_arrival->append(i, data_arrival[i]);
+    for(QVector<uint32_t>::size_type i = 0; i < arrival_data[num_month].size(); ++i){
+        graph_arrival->append(i+1, arrival_data[num_month][i]);
     }
     graph_arrival->setName("Прилеты");
     graph_departure->setName("Вылеты");
@@ -53,21 +53,28 @@ void AirportCongestionShedule::add_data_graph(const QVector<uint32_t> &data_depa
     chart->setAnimationOptions(QChart::SeriesAnimations);
     chart->addSeries(graph_arrival);
     chart->addSeries(graph_departure);
-    for(auto i = 1; i <= num_month+1; ++i){
-        categoty_axis->append(QString::number(i), i);
-    }
-    chart->addAxis(categoty_axis, Qt::AlignBottom);
-    graph_arrival->attachAxis(categoty_axis);
-    graph_departure->attachAxis(categoty_axis);
-    value_axis->setRange(0, max);
-    chart->addAxis(value_axis, Qt::AlignLeft);
-    graph_arrival->attachAxis(value_axis);
-    graph_departure->attachAxis(value_axis);
+    value_axis_x->setRange(1, num_days);
+    value_axis_x->setTickCount(num_days);
+    value_axis_x->setLabelFormat("%.i");
+    value_axis_x->setTitleText("Дни месяца");
+    chart->addAxis(value_axis_x, Qt::AlignBottom);
+    graph_arrival->attachAxis(value_axis_x);
+    graph_departure->attachAxis(value_axis_x);
+    value_axis_y->setRange(0, max);
+    chart->addAxis(value_axis_y, Qt::AlignLeft);
+    graph_arrival->attachAxis(value_axis_y);
+    graph_departure->attachAxis(value_axis_y);
     chart->legend()->setVisible(true);
     chart->legend()->setAlignment(Qt::AlignRight);
     chart_view->setChart(chart);
     chart_view->setRenderHint(QPainter::Antialiasing);
     emit sig_send_graph_view(chart_view);
+}
+
+void AirportCongestionShedule::add_data_shipments(QVector<QVector<uint32_t> > &departure, QVector<QVector<uint32_t> > &arrival)
+{
+    departure_data = std::move(departure);
+    arrival_data = std::move(arrival);
 }
 
 void AirportCongestionShedule::clear_graph()
@@ -77,9 +84,9 @@ void AirportCongestionShedule::clear_graph()
         graph_departure->clear();
         chart->removeSeries(graph_arrival);
         chart->removeSeries(graph_departure);
-        delete categoty_axis;
-        delete value_axis;
-        categoty_axis = new QCategoryAxis();
-        value_axis = new QValueAxis();
+        delete value_axis_y;
+        delete value_axis_x;
+        value_axis_y = new QValueAxis();
+        value_axis_x = new QValueAxis();
     }
 }

@@ -29,7 +29,6 @@ public:
     void turning_on_models();
     void send_reqest_db_for_histogram();
     int getting_days_from_month(int month);
-    bool date_limit(QDate *date);
 
 private slots:
     void sl_getting_the_status_db(bool status);
@@ -40,7 +39,7 @@ private slots:
     void sl_getting_the_query_model_from_histogram(QSqlQueryModel *query_model_departure, QSqlQueryModel *query_model_arrival);
     void sl_add_wd_histogram_airport(QChartView *wd);
     void sl_add_wd_graph_airport(QChartView *wd);
-    void sl_send_reqest_db_for_graph(int month);
+    void sl_send_reqest_db_for_graph();
     void on_act_connect_triggered();
     void on_pb_findBD_clicked();
     void on_pb_statistics_clicked();
